@@ -240,7 +240,7 @@ public:
      */
     string getChrName(string& inputLine) {
         size_t endPosition = inputLine.find_first_of(" \t");
-        string name = inputLine.substr(1, endPosition);
+        string name = inputLine.substr(1, endPosition-1);
 
         if(removedChrName) {
             if(name.find("chr") == 0) {
