@@ -239,8 +239,8 @@ public:
      * this is important when there is space in chromosome name. the SAM information only contain the first word.
      */
     string getChrName(string& inputLine) {
-        size_t endPosition = inputLine.find(' ', 0);
-        string name = inputLine.substr(1, endPosition-1);
+        size_t endPosition = inputLine.find_first_of(" \t");
+        string name = inputLine.substr(1, endPosition);
 
         if(removedChrName) {
             if(name.find("chr") == 0) {
