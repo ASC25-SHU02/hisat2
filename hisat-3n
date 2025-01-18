@@ -28,6 +28,9 @@
 # 2. Redirecting output to various files
 # 3. Output directly to bam (not currently supported)
 
+
+Info("Let's get staeted");
+
 use strict;
 use warnings;
 use Getopt::Long qw(GetOptions);
@@ -102,7 +105,7 @@ sub getConversion {
 		$i++;
 	}
 }
-
+Info("The beginning align_prog is [$align_prog]\n");
 (-x "$align_prog") ||
 	Fail("Expected hisat2 to be in same directory with hisat2-align-s and hisat2-align-l:\n$script_path\n");
 
@@ -292,7 +295,7 @@ my $bam_out = 0;
 my $ref_str = undef;
 my $no_pipes = 0;
 my $keep = 0;
-my $verbose = 0;
+my $verbose = 1;
 my $readpipe = undef;
 my $log_fName = undef;
 
@@ -337,7 +340,7 @@ if ((scalar(@read_files) > 0)
 	Info("Check read length: $read_files[0]\n");
 	my $cmd = "'$read_stat_prog' $read_files[0]";
 	my $read_len_str = "";
-
+	Info("the command: [$cmd]; read length: [$read_len_str]\n");
 	open(my $fh, "$cmd |") || Fail("Failed to run command '$cmd'\n");
 	while(readline $fh) {
 		chomp;
@@ -357,6 +360,7 @@ if ((scalar(@read_files) > 0)
 	}
 }
 
+Info("Check read length finished\n");
 sub check_file_exist($$$) {
 	my ($unps, $mate1s, $mate2s) = @_;
 	for my $fn (@$unps, @$mate1s, @$mate2s) {
@@ -413,6 +417,7 @@ sub Fail {
 
 sub Extract_IndexName_From {
     my $index_opt = $ref_str ? '--index' : '-x';
+    Info("index_opt is [$index_opt]");
     for (my $i=0; $i<@_; $i++) {
         if ($_[$i] eq $index_opt){
 			my $idx_basename = $_[$i+1];
@@ -427,7 +432,7 @@ sub Extract_IndexName_From {
 				}
 				$idx_basename = "$ENV{'HISAT2_INDEXES'}/$idx_basename"
 			}
-
+	    
             return $idx_basename;
         }
     }
@@ -444,13 +449,14 @@ sub Get_IndexFileName {
 	} else {
 		$IndexFileName = $IndexFileName.$idx_ext_s;
 	}
-
+	Info("The IndexFileName is [$IndexFileName]\n");
 	return $IndexFileName;
 }
 
 if($seq_in_args == 0) {
 	check_file_exist(\@unps, \@mate1s, \@mate2s);
 }
+Info("check file exist finished\n");
 
 if(wrapInput(\@unps, \@mate1s, \@mate2s)) {
 	if(scalar(@mate2s) > 0) {
@@ -529,7 +535,7 @@ if(wrapInput(\@unps, \@mate1s, \@mate2s)) {
 		push @ht2_args, ("-U", join(",", @unps));
 	}
 }
-
+Info("Warp Input finished\n");
 if(defined($ref_str)) {
 	my $ofn = "$temp_dir/$$.ref_str.fa";
 	open(my $ofh, ">$ofn") ||
@@ -545,7 +551,7 @@ if(defined($ref_str)) {
 			  "$ofn.5.".$idx_ext, "$ofn.6.".$idx_ext,
 			  "$ofn.7.".$idx_ext, "$ofn.8.".$idx_ext);
 }
-
+Info("DiduDidu\n");
 Info("After arg handling:\n");
 Info("  Binary args:\n[ @ht2_args ]\n");
 
@@ -571,11 +577,12 @@ sub find_hisat3n_index {
 			push @IndexFullName, $_.".$idx_ext_s";
 		}
 	}
-
+	
+	Info("find their names: [$IndexFullName[0]] and [$IndexFullName[1]]\n");
 	if (-f $IndexFullName[0] && -f $IndexFullName[1]) {
 		return @IndexFullName; 
 	}
-	
+	# Info("You fucking cannot find it???\n");	
 	# find old-name-format index file 
 	@IndexNames = (
 			$IndexName.".3n.1.1",
@@ -603,7 +610,7 @@ sub find_hisat3n_index {
 my $index_name = Extract_IndexName_From(@ht2_args);
 my $def_index_filename_s = $index_name.".3n.$basechange_pair.1.$idx_ext_s";
 my $def_index_filename_l = $index_name.".3n.$basechange_pair.1.$idx_ext_l";
-
+Info("Index_name is [ $index_name ]\n");
 if ($large_idx) {
     Info("Using a large index enforced by user.\n");
     $align_prog  = $align_prog_l;

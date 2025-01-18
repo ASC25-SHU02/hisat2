@@ -243,6 +243,17 @@ bool getSAMChromosomePos(string* line, string& chr, long long int& pos) {
 
 int hisat_3n_table()
 {
+    // Disable the synchronization with stdio
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(0); std::cout.tie(0);
+
+    // Create a custom buffer of 1 MB
+    const size_t buffer_size = 1024 * 1024;  // 1 MB
+    std::vector<char> custom_buffer(buffer_size);
+
+    // Replace std::cin's buffer with the custom buffer
+    std::cin.rdbuf()->pubsetbuf(custom_buffer.data(), buffer_size);
+
     positions = new Positions(refFileName, nThreads, addedChrName, removedChrName);
 
     // open #nThreads workers
