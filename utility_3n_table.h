@@ -21,6 +21,8 @@
 #define UTILITY_3N_TABLE_H
 
 #include <mutex>
+#include <condition_variable>
+#include <iostream>
 #include <queue>
 #include <algorithm>
 
@@ -193,6 +195,7 @@ class SafeQueue {
 private:
     mutex mutex_;
     queue<T> queue_;
+    std::condition_variable notEmpty_;
 
     string getReadName(string* line){
         int startPosition = 0;
@@ -205,22 +208,19 @@ private:
 
 public:
     void pop() {
-        mutex_.lock();
+        std::unique_lock<std::mutex> lk(mutex_);
         queue_.pop();
-        mutex_.unlock();
     }
 
     T front() {
-        mutex_.lock();
+        std::unique_lock<std::mutex> lk(mutex_);
         T value = queue_.front();
-        mutex_.unlock();
         return value;
     }
 
     int size() {
-        mutex_.lock();
+        std::unique_lock<std::mutex> lk(mutex_);
         int s = queue_.size();
-        mutex_.unlock();
         return s;
     }
 
@@ -229,27 +229,59 @@ public:
      * return false if the queue is empty.
      */
     bool popFront(T& value) {
-        mutex_.lock();
+        std::unique_lock<std::mutex> lk(mutex_);
         bool isEmpty = queue_.empty();
         if (!isEmpty) {
             value = queue_.front();
             queue_.pop();
         }
-        mutex_.unlock();
         return !isEmpty;
     }
 
     void push(T value) {
-        mutex_.lock();
+        std::unique_lock<std::mutex> lk(mutex_);
         queue_.push(value);
-        mutex_.unlock();
     }
 
     bool empty() {
-        mutex_.lock();
+        std::unique_lock<std::mutex> lk(mutex_);
         bool check = queue_.empty();
-        mutex_.unlock();
         return check;
+    }
+
+    void pushAndNotify(T value) {
+try {
+        // outputPositionPool get something to run, thus notify other to wake
+        std::unique_lock<std::mutex> lk(mutex_);
+        if (queue_.empty()) {
+            queue_.push(value);
+            std::cerr << "HEY. YOU SHOULD WAKE UP\t";
+            notEmpty_.notify_all();
+        } else {
+            queue_.push(value);
+        }
+        lk.unlock();
+} catch (const std::exception& e) {
+    std::cerr << "Caught exception: " << e.what() << std::endl;
+    exit(1);
+}
+    }
+
+    // You should have done it as a virtual base(i.e. interface), but I have no time reconstruct it
+    bool printOrWait(T& pos) {
+        std::unique_lock<std::mutex> lk(mutex_);
+        if (queue_.size()) {
+            pos = queue_.front();
+            lk.unlock();
+            return true;
+        } else {
+            // this_thread::sleep_for (std::chrono::microseconds(1));
+            std::cerr << "I wait for work??\t";
+            notEmpty_.wait(lk);
+            lk.unlock();
+            std::cerr << "I get waken up\t";
+            return false;
+        }
     }
 };
 

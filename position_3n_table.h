@@ -25,6 +25,7 @@
 #include <fstream>
 #include <mutex>
 #include <thread>
+#include <condition_variable>
 #include <cassert>
 #include "alignment_3n_table.h"
 
@@ -324,7 +325,6 @@ public:
      */
     void outputFunction(string outputFileName) {
         ostream* out_ = &cout;
-        out_ = &cout;
         ofstream tableFile;
         if (!outputFileName.empty()) {
             tableFile.open(outputFileName, ios_base::out);
@@ -334,17 +334,15 @@ public:
         *out_ << "ref\tpos\tstrand\tconvertedBaseQualities\tconvertedBaseCount\tunconvertedBaseQualities\tunconvertedBaseCount\n";
         Position* pos;
         while (working) {
-            if (outputPositionPool.popFront(pos)) {
+            if (outputPositionPool.printOrWait(pos)) {
                 *out_ << pos->chromosome << '\t'
-                          << to_string(pos->location) << '\t'
-                          << pos->strand << '\t'
-                          << pos->convertedQualities << '\t'
-                          << to_string(pos->convertedQualities.size()) << '\t'
-                          << pos->unconvertedQualities << '\t'
-                          << to_string(pos->unconvertedQualities.size()) << '\n';
+                            << to_string(pos->location) << '\t'
+                            << pos->strand << '\t'
+                            << pos->convertedQualities << '\t'
+                            << to_string(pos->convertedQualities.size()) << '\t'
+                            << pos->unconvertedQualities << '\t'
+                            << to_string(pos->unconvertedQualities.size()) << '\n';
                 returnPosition(pos);
-            } else {
-                this_thread::sleep_for (std::chrono::microseconds(1));
             }
         }
         tableFile.close();
@@ -363,7 +361,13 @@ public:
                 if (refPositions[index]->empty() || refPositions[index]->strand == '?') {
                     returnPosition(refPositions[index]);
                 } else {
-                    outputPositionPool.push(refPositions[index]);
+                    // try {
+                    // outputPositionPool.lock();
+                    // outputPositionPool.unlock();
+                    // } catch (const std::exception& e) {
+                    //     std::cerr << e.what() << endl;
+                    // }
+                    outputPositionPool.pushAndNotify(refPositions[index]);
                 }
             } else {
                 break;
@@ -386,7 +390,7 @@ public:
                 returnPosition(refPositions[index]);
             } else {
                 vector<uniqueID>().swap(refPositions[index]->uniqueIDs);
-                outputPositionPool.push(refPositions[index]);
+                outputPositionPool.pushAndNotify(refPositions[index]);
             }
         }
         refPositions.clear();

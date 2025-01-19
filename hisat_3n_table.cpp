@@ -70,22 +70,22 @@ static struct option long_options[] {
         };
 
 static void printHelp(ostream& out) {
-    out << "hisat-3n-table developed by Yun (Leo) Zhang" << endl;
-    out << "Usage:" << endl
-        << "hisat-3n-table [options]* --alignments <alignmentFile> --ref <refFile> --output-name <outputFile> --base-change <char1,char2>" << endl
-        << "  <alignmentFile>           SORTED SAM filename. Please enter '-' for standard input." << endl
-        << "  <refFile>                 reference file (should be FASTA format)." << endl
-        << "  <outputFile>              file name to save the 3n table (tsv format). By default, alignments are written to the “standard out” or “stdout” filehandle (i.e. the console)." << endl
-        << "  <chr1,chr2>               the char1 is the nucleotide converted from, the char2 is the nucleotide converted to." << endl;
-    out << "Options (defaults in parentheses):" << endl
-        << " Input:" << endl
-        << "  -u/--unique-only          only count the base which is in unique mapped reads." << endl
-        << "  -m/--multiple-only        only count the base which is in multiple mapped reads." << endl
-        << "  -c/--CG-only              only count CG and ignore CH in reference." << endl
-        << "  --added-chrname           please add this option if you use --add-chrname during HISAT-3N alignment." << endl
-        << "  --removed-chrname         please add this option if you use --remove-chrname during HISAT-3N alignment." << endl
-        << "  -p/--threads <int>        number of threads to launch (1)." << endl
-        << "  -h/--help                 print this usage message." << endl;
+    out << "hisat-3n-table developed by Yun (Leo) Zhang" << '\n';
+    out << "Usage:" << '\n'
+        << "hisat-3n-table [options]* --alignments <alignmentFile> --ref <refFile> --output-name <outputFile> --base-change <char1,char2>" << '\n'
+        << "  <alignmentFile>           SORTED SAM filename. Please enter '-' for standard input." << '\n'
+        << "  <refFile>                 reference file (should be FASTA format)." << '\n'
+        << "  <outputFile>              file name to save the 3n table (tsv format). By default, alignments are written to the “standard out” or “stdout” filehandle (i.e. the console)." << '\n'
+        << "  <chr1,chr2>               the char1 is the nucleotide converted from, the char2 is the nucleotide converted to." << '\n';
+    out << "Options (defaults in parentheses):" << '\n'
+        << " Input:" << '\n'
+        << "  -u/--unique-only          only count the base which is in unique mapped reads." << '\n'
+        << "  -m/--multiple-only        only count the base which is in multiple mapped reads." << '\n'
+        << "  -c/--CG-only              only count CG and ignore CH in reference." << '\n'
+        << "  --added-chrname           please add this option if you use --add-chrname during HISAT-3N alignment." << '\n'
+        << "  --removed-chrname         please add this option if you use --remove-chrname during HISAT-3N alignment." << '\n'
+        << "  -p/--threads <int>        number of threads to launch (1)." << '\n'
+        << "  -h/--help                 print this usage message." << '\n';
 }
 
 static void parseOption(int next_option, const char *optarg) {
@@ -97,7 +97,7 @@ static void parseOption(int next_option, const char *optarg) {
                 break;
             }
             if (!fileExist(alignmentFileName)) {
-                cerr << "The alignment file is not exist." << endl;
+                cerr << "The alignment file is not exist." << '\n';
                 throw (1);
             }
             break;
@@ -105,7 +105,7 @@ static void parseOption(int next_option, const char *optarg) {
         case 'r': {
             refFileName = optarg;
             if (!fileExist(refFileName)) {
-                cerr << "reference (FASTA) file is not exist." << endl;
+                cerr << "reference (FASTA) file is not exist." << '\n';
                 throw (1);
             }
             break;
@@ -117,7 +117,7 @@ static void parseOption(int next_option, const char *optarg) {
             string arg = optarg;
             if (arg.size() != 3 || arg[1] != ',') {
                 cerr << "Error: expected 2 comma-separated "
-                     << "arguments to --base-change option (e.g. C,T), got " << arg << endl;
+                     << "arguments to --base-change option (e.g. C,T), got " << arg << '\n';
                 throw 1;
             }
             convertFrom = toupper(arg.front());
@@ -174,7 +174,7 @@ static void parseOptions(int argc, const char **argv) {
 
     // check filenames
     if (refFileName.empty() || alignmentFileName.empty()) {
-        cerr << "No reference or SAM file specified!" << endl;
+        cerr << "No reference or SAM file specified!" << '\n';
         printHelp(cerr);
         throw 1;
     }
@@ -182,7 +182,7 @@ static void parseOptions(int argc, const char **argv) {
     // give a warning for CG-only
     if (CG_only) {
         if (convertFrom != 'C' || convertTo != 'T') {
-            cerr << "Warning! You are using CG-only mode. The the --base-change option is set to: C,T" << endl;
+            cerr << "Warning! You are using CG-only mode. The the --base-change option is set to: C,T" << '\n';
             convertFrom = 'C';
             convertTo = 'T';
         }
@@ -190,12 +190,12 @@ static void parseOptions(int argc, const char **argv) {
 
     // check if --base-change is empty
     if (convertFrom == '0' || convertTo == '0') {
-        cerr << "the --base-change argument is required." << endl;
+        cerr << "the --base-change argument is required." << '\n';
         throw 1;
     }
 
     if(removedChrName && addedChrName) {
-        cerr << "Error: --removed-chrname and --added-chrname cannot be used at the same time" << endl;
+        cerr << "Error: --removed-chrname and --added-chrname cannot be used at the same time" << '\n';
         throw 1;
     }
 
@@ -247,6 +247,8 @@ int hisat_3n_table()
 
     // open #nThreads workers
     vector<thread*> workers;
+
+    std::cerr << "Number of threads is " << nThreads << '\n';
     for (int i = 0; i < nThreads; i++) {
         workers.push_back(new thread(&Positions::append, positions, i));
     }
@@ -282,10 +284,14 @@ int hisat_3n_table()
             positions->returnLine(line);
             continue;
         }
+        /*
+        * We don't need to save the memory (maybe...) Load as long as the chromosome is the same.
+        */
         // limit the linePool size to save memory
-        while(positions->linePool.size() > 1000 * nThreads) {
-            this_thread::sleep_for (std::chrono::microseconds(1));
-        }
+        // while(positions->linePool.size() > 1000 * nThreads) {
+        //     this_thread::sleep_for (std::chrono::microseconds(1));
+        // }
+
         // if the SAM line is empty or unmapped, get the next SAM line.
         if (!getSAMChromosomePos(line, samChromosome, samPos)) {
             positions->returnLine(line);
@@ -315,7 +321,7 @@ int hisat_3n_table()
             reloadPos += loadingBlockSize;
         }
         if (lastPos > samPos) {
-            cerr << "The input alignment file is not sorted. Please use sorted SAM file as alignment file." << endl;
+            cerr << "The input alignment file is not sorted. Please use sorted SAM file as alignment file." << '\n';
             throw 1;
         }
         positions->linePool.push(line);
@@ -363,17 +369,17 @@ int main(int argc, const char** argv)
         parseOptions(argc, argv);
         ret = hisat_3n_table();
     } catch(std::exception& e) {
-        cerr << "Error: Encountered exception: '" << e.what() << "'" << endl;
+        cerr << "Error: Encountered exception: '" << e.what() << "'" << '\n';
         cerr << "Command: ";
         for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
-        cerr << endl;
+        cerr << '\n';
         return 1;
     } catch(int e) {
         if (e != 0) {
-            cerr << "Error: Encountered internal HISAT-3N exception (#" << e << ")" << endl;
+            cerr << "Error: Encountered internal HISAT-3N exception (#" << e << ")" << '\n';
             cerr << "Command: ";
             for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
-            cerr << endl;
+            cerr << '\n';
         }
         return e;
     }
