@@ -324,7 +324,7 @@ public:
      * the output function for output thread.
      */
     void outputFunction(string outputFileName) {
-        ostream* out_ = &cout;
+        ostream* out_ = &cerr;
         ofstream tableFile;
         if (!outputFileName.empty()) {
             tableFile.open(outputFileName, ios_base::out);
@@ -361,12 +361,6 @@ public:
                 if (refPositions[index]->empty() || refPositions[index]->strand == '?') {
                     returnPosition(refPositions[index]);
                 } else {
-                    // try {
-                    // outputPositionPool.lock();
-                    // outputPositionPool.unlock();
-                    // } catch (const std::exception& e) {
-                    //     std::cerr << e.what() << endl;
-                    // }
                     outputPositionPool.pushAndNotify(refPositions[index]);
                 }
             } else {

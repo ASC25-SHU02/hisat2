@@ -267,7 +267,6 @@ try {
 }
     }
 
-    // You should have done it as a virtual base(i.e. interface), but I have no time reconstruct it
     bool printOrWait(T& pos) {
         std::unique_lock<std::mutex> lk(mutex_);
         if (queue_.size()) {
@@ -275,8 +274,6 @@ try {
             lk.unlock();
             return true;
         } else {
-            // this_thread::sleep_for (std::chrono::microseconds(1));
-            std::cerr << "I wait for work??\t";
             notEmpty_.wait(lk);
             lk.unlock();
             std::cerr << "I get waken up\t";
