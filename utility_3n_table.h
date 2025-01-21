@@ -196,6 +196,7 @@ private:
     mutex mutex_;
     queue<T> queue_;
     std::condition_variable notEmpty_;
+    bool killed_ = false;
 
     string getReadName(string* line){
         int startPosition = 0;
@@ -214,8 +215,7 @@ public:
 
     T front() {
         std::unique_lock<std::mutex> lk(mutex_);
-        T value = queue_.front();
-        return value;
+        return queue_.front();
     }
 
     int size() {
@@ -245,8 +245,12 @@ public:
 
     bool empty() {
         std::unique_lock<std::mutex> lk(mutex_);
-        bool check = queue_.empty();
-        return check;
+        return queue_.empty();
+    }
+
+    void close() {
+        killed_ = true;
+        notEmpty_.notify_all();
     }
 
     void pushAndNotify(T value) {
@@ -269,8 +273,9 @@ try {
 try {
         std::unique_lock<std::mutex> lk(mutex_);
         if (queue_.empty()) {
-            notEmpty_.wait(lk, [this]() { return !queue_.empty(); });
+            notEmpty_.wait(lk);
         }
+        if (killed_) return;
         pos = queue_.front();
         queue_.pop();
 } catch (const std::exception& e) {

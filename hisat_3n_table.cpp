@@ -350,7 +350,7 @@ int hisat_3n_table()
     while(positions->freeLinePool.popFront(line)) {
         delete line;
     }
-    positions->working = false;
+    positions->close();
     for (int i = 0; i < nThreads; i++){
         workers[i]->join();
         delete workers[i];

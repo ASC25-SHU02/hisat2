@@ -331,16 +331,15 @@ public:
             out_ = &tableFile;
         }
 
-        *out_ << "ref\tpos\tstrand\tconvertedBaseQualities\tconvertedBaseCount\tunconvertedBaseQualities\tunconvertedBaseCount\n";
+        *out_ << "ref\tpos\tstrand\tconvertedBaseCount\tunconvertedBaseCount\n";
         Position* pos;
         while (working) {
             outputPositionPool.printOrWait(pos);
+            if (!working) break;
             *out_ << pos->chromosome << '\t'
                             << to_string(pos->location) << '\t'
                             << pos->strand << '\t'
-                            << pos->convertedQualities << '\t'
                             << to_string(pos->convertedQualities.size()) << '\t'
-                            << pos->unconvertedQualities << '\t'
                             << to_string(pos->unconvertedQualities.size()) << '\n';
             returnPosition(pos);
         }
@@ -514,6 +513,11 @@ public:
     void returnPosition(Position* pos) {
         pos->initialize();
         freePositionPool.push(pos);
+    }
+
+    void close() {
+        working = false;
+        outputPositionPool.close();
     }
 
     /**
