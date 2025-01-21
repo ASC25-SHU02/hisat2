@@ -255,30 +255,28 @@ try {
         std::unique_lock<std::mutex> lk(mutex_);
         if (queue_.empty()) {
             queue_.push(value);
-            std::cerr << "HEY. YOU SHOULD WAKE UP\t";
             notEmpty_.notify_all();
         } else {
             queue_.push(value);
         }
-        lk.unlock();
 } catch (const std::exception& e) {
     std::cerr << "Caught exception: " << e.what() << std::endl;
     exit(1);
 }
     }
 
-    bool printOrWait(T& pos) {
+    void printOrWait(T& pos) {
+try {
         std::unique_lock<std::mutex> lk(mutex_);
-        if (queue_.size()) {
-            pos = queue_.front();
-            lk.unlock();
-            return true;
-        } else {
-            notEmpty_.wait(lk);
-            lk.unlock();
-            std::cerr << "I get waken up\t";
-            return false;
+        if (queue_.empty()) {
+            notEmpty_.wait(lk, [this]() { return !queue_.empty(); });
         }
+        pos = queue_.front();
+        queue_.pop();
+} catch (const std::exception& e) {
+    std::cerr << "Caught exception: " << e.what() << std::endl;
+    exit(1);
+}
     }
 };
 

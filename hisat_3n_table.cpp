@@ -248,7 +248,6 @@ int hisat_3n_table()
     // open #nThreads workers
     vector<thread*> workers;
 
-    std::cerr << "Number of threads is " << nThreads << '\n';
     for (int i = 0; i < nThreads; i++) {
         workers.push_back(new thread(&Positions::append, positions, i));
     }
@@ -334,7 +333,7 @@ int hisat_3n_table()
 
 
     // prepare to close everything.
-
+    std::cerr << "I have finished all the works\t";
     // make sure linePool is empty
     while (!positions->linePool.empty()) {
         this_thread::sleep_for (std::chrono::microseconds(100));

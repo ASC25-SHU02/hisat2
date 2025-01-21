@@ -324,7 +324,7 @@ public:
      * the output function for output thread.
      */
     void outputFunction(string outputFileName) {
-        ostream* out_ = &cerr;
+        ostream* out_ = &cout;
         ofstream tableFile;
         if (!outputFileName.empty()) {
             tableFile.open(outputFileName, ios_base::out);
@@ -334,16 +334,15 @@ public:
         *out_ << "ref\tpos\tstrand\tconvertedBaseQualities\tconvertedBaseCount\tunconvertedBaseQualities\tunconvertedBaseCount\n";
         Position* pos;
         while (working) {
-            if (outputPositionPool.printOrWait(pos)) {
-                *out_ << pos->chromosome << '\t'
+            outputPositionPool.printOrWait(pos);
+            *out_ << pos->chromosome << '\t'
                             << to_string(pos->location) << '\t'
                             << pos->strand << '\t'
                             << pos->convertedQualities << '\t'
                             << to_string(pos->convertedQualities.size()) << '\t'
                             << pos->unconvertedQualities << '\t'
                             << to_string(pos->unconvertedQualities.size()) << '\n';
-                returnPosition(pos);
-            }
+            returnPosition(pos);
         }
         tableFile.close();
     }
@@ -469,8 +468,7 @@ public:
             Position* pos = refPositions[index+b->refPos];
             assert (pos->location == startPos + b->refPos);
 
-            if (pos->strand == '?') {
-                // this is for CG-only mode. read has a 'C' or 'G' but not 'CG'.
+            if (pos->strand == '?') {// this is for CG-only mode. read has a 'C' or 'G' but not 'CG'.
                 continue;
             }
             pos->appendBase(newAlignment.bases[i], newAlignment);
