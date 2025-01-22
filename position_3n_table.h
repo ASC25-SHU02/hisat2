@@ -107,21 +107,34 @@ public:
      * always return a index.
      * if cannot find, return the index which has bigger value than input readNameID.
      */
-    int searchReadNameID (unsigned long long&readNameID, int start, int end) {
-        if (uniqueIDs.empty()) {
-            return 0;
-        }
-        if (start <= end) {
-            int middle = (start + end) / 2;
-            if (uniqueIDs[middle].readNameID == readNameID) {
-                return middle;
+    int searchReadNameID (unsigned long long&readNameID, int st, int ed) {
+        // if (uniqueIDs.empty()) {
+        //     return 0;
+        // }
+        // if (start <= end) {
+        //     int middle = (start + end) / 2;
+        //     if (uniqueIDs[middle].readNameID == readNameID) {
+        //         return middle;
+        //     }
+        //     if (uniqueIDs[middle].readNameID > readNameID) {
+        //         return searchReadNameID(readNameID, start, middle-1);
+        //     }
+        //     return searchReadNameID(readNameID, middle+1, end);
+        // }
+        // return start; // return the bigger one
+
+        int ll = st, rr = ed;
+        while (ll < rr) {
+            int mid = (ll + rr + 1) >> 1;
+            if (uniqueIDs[mid].readNameID > readNameID) {
+                rr = mid - 1;
+            } else if (uniqueIDs[mid].readNameID < readNameID) {
+                ll = mid;
+            } else {
+                return mid;
             }
-            if (uniqueIDs[middle].readNameID > readNameID) {
-                return searchReadNameID(readNameID, start, middle-1);
-            }
-            return searchReadNameID(readNameID, middle+1, end);
         }
-        return start; // return the bigger one
+        return ll;
     }
 
 
