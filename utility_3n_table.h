@@ -249,6 +249,7 @@ public:
     }
 
     void close() {
+        std::unique_lock<std::mutex> lk(mutex_);
         killed_ = true;
         notEmpty_.notify_all();
     }
@@ -269,7 +270,7 @@ try {
 }
     }
 
-    void printOrWait(T& pos) {
+    void popFrontOrWait(T& pos) {
 try {
         std::unique_lock<std::mutex> lk(mutex_);
         if (queue_.empty()) {
@@ -282,6 +283,21 @@ try {
     std::cerr << "Caught exception: " << e.what() << std::endl;
     exit(1);
 }
+    }
+
+    // overload popFrontOrWait with lock
+    void popFrontOrWait(T& pos, mutex* workerLock) {
+        std::unique_lock<std::mutex> lk(mutex_);
+        if (queue_.empty()) {
+            workerLock->unlock();
+            notEmpty_.wait(lk, [this]() { return !queue_.empty() || killed_; });
+            workerLock->lock();
+        }
+        if (killed_) {
+            return;
+        }
+        pos = queue_.front();
+        queue_.pop();
     }
 };
 

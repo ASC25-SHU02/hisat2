@@ -314,6 +314,7 @@ public:
      * if we can go through all the workerLock, that means no worker is appending new position.
      */
     void appendingFinished() {
+        // Seems workerLock() is only used here
         for (int i = 0; i < nThreads; i++) {
             workerLock[i]->lock();
             workerLock[i]->unlock();
@@ -334,7 +335,7 @@ public:
         *out_ << "ref\tpos\tstrand\tconvertedBaseCount\tunconvertedBaseCount\n";
         Position* pos;
         while (working) {
-            outputPositionPool.printOrWait(pos);
+            outputPositionPool.popFrontOrWait(pos);
             if (!working) break;
             *out_ << pos->chromosome << '\t'
                             << to_string(pos->location) << '\t'
@@ -417,6 +418,7 @@ public:
                 }
             }
         }
+        std::cerr << "loadNewChromosome RETURN\t";
     }
 
     /**
@@ -460,7 +462,7 @@ public:
 
         for (int i = 0; i < newAlignment.sequence.size(); i++) {
             PosQuality* b = &newAlignment.bases[i];
-            if (b->remove) {
+            if (b->remove) { // used to modify here
                 continue;
             }
 
@@ -518,6 +520,7 @@ public:
     void close() {
         working = false;
         outputPositionPool.close();
+        linePool.close();
     }
 
     /**
@@ -525,16 +528,16 @@ public:
      * it take the SAM line from linePool, parse it.
      */
     void append(int threadID) {
-        string* line;
+        string* line = nullptr;
         Alignment newAlignment;
 
         while (working) {
-            workerLock[threadID]->lock();
-            if(!linePool.popFront(line)) {
-                workerLock[threadID]->unlock();
-                this_thread::sleep_for (std::chrono::nanoseconds(1));
-                continue;
-            }
+            std::unique_lock<std::mutex> lk(*workerLock[threadID]);
+
+            linePool.popFrontOrWait(line, workerLock[threadID]);
+            if (!working) break;
+            // if (line == nullptr || (*line).size() == 0) continue;
+
             while (refPositions.empty()) {
                 this_thread::sleep_for (std::chrono::microseconds(1));
             }

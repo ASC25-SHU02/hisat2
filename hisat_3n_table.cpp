@@ -323,7 +323,7 @@ int hisat_3n_table()
             cerr << "The input alignment file is not sorted. Please use sorted SAM file as alignment file." << '\n';
             throw 1;
         }
-        positions->linePool.push(line);
+        positions->linePool.pushAndNotify(line);
         lastPos = samPos;
     }
     //}
