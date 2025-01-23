@@ -87,6 +87,30 @@
 #include "read.h"
 #include "reference.h"
 #include "mem_ids.h"
+// #include <omp.h>
+#include <vector>
+#include <unordered_map>
+#include <utility>
+#include <cassert>
+
+// A cache structure for the function `mapGLF`
+template<typename index_t>
+struct CacheKey {
+	index_t top, bot, i;
+	bool operator==(const CacheKey& o) const {
+		return top == o.top && bot == o.bot && i == o.i;
+	}
+};
+
+template <typename index_t>
+struct CacheKeyHash {
+    size_t operator()(const CacheKey<index_t>& k) const {
+        return hash<index_t>()(k.top) ^ hash<index_t>()(k.bot) ^ hash<int>()(k.i);
+    }
+};
+
+template <typename index_t>
+using CacheMap = unordered_map<CacheKey<index_t>, pair<index_t, index_t>, CacheKeyHash<index_t>>;
 
 /**
  * Encapsulate an SA range and an associated list of slots where the resolved
@@ -446,7 +470,10 @@ protected:
  */
 template<typename index_t, typename T>
 class GWState {
-	
+private:
+	static CacheMap<index_t> NodeRangeCache;
+	static CacheMap<index_t> RangeCache;
+
 public:
 
 	GWState() : map_(0, GW_CAT) {
@@ -1108,7 +1135,8 @@ public:
                     assert_eq(curbot-curtop, (index_t)(gws.masks[i].size()));
                 }
 #endif
-                
+				// I don't know whether this will have a conflict with main thread pool so I give up this
+                // #pragma omp parallel for reduction(+:ret.first, ret.second) schedule(dynamic)
                 for(int i = 0; i < 4; i++) {
                     if(in[i] > 0) {
                         // Non-empty range resulted
@@ -1117,8 +1145,17 @@ public:
                             first = false;
                             pair<index_t, index_t> range, node_range;
                             backup_node_iedge_count.clear();
-                            SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
-                            range = gfm.mapGLF(curtloc, curbloc, i, &node_range, &backup_node_iedge_count, cur_node_bot - cur_node_top);
+
+							// Check cached MapGLF results
+							CacheKey<index_t> key{curtop, curbot, i};
+							if (auto it = RangeCache.find(key); it != RangeCache.end()) {
+								range = it->second;
+							} else {
+								SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
+                            	range = gfm.mapGLF(curtloc, curbloc, i, &node_range, &backup_node_iedge_count, cur_node_bot - cur_node_top);
+								RangeCache[key] = range;
+							}
+
                             newtop = range.first;
                             newbot = range.second;
                             new_node_top = node_range.first;
@@ -1163,8 +1200,16 @@ public:
                                         }
                                     }
                                     assert_lt(j1, j2);
-                                    SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
-                                    gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
+                                    
+									CacheKey<index_t> tmp_key{curtop + j1, curtop + j2 + 1, i};
+									if (auto it = NodeRangeCache<index_t>.find(tmp_key)); it != NodeRangeCache<index_t>.end()) {
+										tmp_node_range = it->second;	
+									} else {
+										SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
+										gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
+										NodeRangeCache<index_t>[tmp_key] = tmp_node_range;
+									}
+
                                     assert_gt(tmp_node_range.second - tmp_node_range.first, 0);
                                     if(tmp_node_range.second - tmp_node_range.first == 1) {
                                         index_t jmap = gws.map[j];
@@ -1229,8 +1274,16 @@ public:
                                         }
                                     }
                                     assert_lt(j1, j2);
-                                    SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
-                                    gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
+
+									CacheKey<index_t> key{curtop + j1, curtop + j2 + 1, i};
+									if (auto it = NodeRangeCache<index_t>.find(key); it != NodeRangeCache<index_t>.end()) {
+										tmp_node_range = it->second;
+									} else {
+										SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
+										gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
+										NodeRangeCache<index_t>[key] = tmp_node_range;
+									}
+
                                     assert_gt(tmp_node_range.second - tmp_node_range.first, 0);
                                     if(tmp_node_range.second - tmp_node_range.first == 1) {
                                         index_t jmap = st.back().map_[j];
