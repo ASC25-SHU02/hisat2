@@ -1,0 +1,3 @@
+[submodule "include/lockfreeQueue"]
+	path = include/lockfreeQueue
+	url = https://github.com/ASC25-SHU02/LockFreeQueue.git
