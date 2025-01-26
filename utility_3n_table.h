@@ -25,6 +25,7 @@
 #include <iostream>
 #include <queue>
 #include <algorithm>
+#include "include/lockfreeQueue/blockingconcurrentqueue.h"
 
 using namespace std;
 
@@ -193,10 +194,9 @@ public:
 template <typename T>
 class SafeQueue {
 private:
-    mutex mutex_;
-    queue<T> queue_;
-    std::condition_variable notEmpty_;
-    bool killed_ = false;
+    moodycamel::BlockingConcurrentQueue<T> queue_;
+
+    std::atomic<int> cnt;
 
     string getReadName(string* line){
         int startPosition = 0;
@@ -208,20 +208,17 @@ private:
     }
 
 public:
-    void pop() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        queue_.pop();
-    }
+    SafeQueue(): cnt(0) {}
 
-    T front() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        return queue_.front();
-    }
-
+    /**
+     * Conversative size count, i.e. rather bigger than the real size
+     */
     int size() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        int s = queue_.size();
-        return s;
+        return cnt.load(std::memory_order_relaxed);
+    }
+
+    int shrinkedSize() {
+        return queue_.size_approx();
     }
 
     /**
@@ -229,56 +226,25 @@ public:
      * return false if the queue is empty.
      */
     bool popFront(T& value) {
-        std::unique_lock<std::mutex> lk(mutex_);
-        bool isEmpty = queue_.empty();
-        if (!isEmpty) {
-            value = queue_.front();
-            queue_.pop();
-        }
-        return !isEmpty;
+        bool ret = queue_.try_dequeue(value);
+        cnt.fetch_add(-1, std::memory_order_release);
+        return ret;
     }
 
     void push(T value) {
-        std::unique_lock<std::mutex> lk(mutex_);
-        queue_.push(value);
+        cnt.fetch_add(1, std::memory_order_acquire);
+        queue_.enqueue(value);
     }
 
+    /* Definitly empty if true */
     bool empty() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        return queue_.empty();
+        return this->size() == 0;
     }
 
-    void close() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        killed_ = true;
-        notEmpty_.notify_all();
-    }
 
-    void pushAndNotify(T value) {
+    void popFrontOrWait(T& val) {
 try {
-        // outputPositionPool get something to run, thus notify other to wake
-        std::unique_lock<std::mutex> lk(mutex_);
-        if (queue_.empty()) {
-            queue_.push(value);
-            notEmpty_.notify_all();
-        } else {
-            queue_.push(value);
-        }
-} catch (const std::exception& e) {
-    std::cerr << "Caught exception: " << e.what() << std::endl;
-    exit(1);
-}
-    }
-
-    void popFrontOrWait(T& pos) {
-try {
-        std::unique_lock<std::mutex> lk(mutex_);
-        if (queue_.empty()) {
-            notEmpty_.wait(lk);
-        }
-        if (killed_) return;
-        pos = queue_.front();
-        queue_.pop();
+        queue_.wait_dequeue(val);
 } catch (const std::exception& e) {
     std::cerr << "Caught exception: " << e.what() << std::endl;
     exit(1);
@@ -286,18 +252,9 @@ try {
     }
 
     // overload popFrontOrWait with lock
-    void popFrontOrWait(T& pos, mutex* workerLock) {
-        std::unique_lock<std::mutex> lk(mutex_);
-        if (queue_.empty()) {
-            workerLock->unlock();
-            notEmpty_.wait(lk, [this]() { return !queue_.empty() || killed_; });
-            workerLock->lock();
-        }
-        if (killed_) {
-            return;
-        }
-        pos = queue_.front();
-        queue_.pop();
+    void popFrontOrWait(T& val, mutex* workerLock) {
+        // HAVE MODIFIED THE SOURCE CODE!
+        queue_.wait_dequeue_with_lock(val, workerLock);
     }
 };
 

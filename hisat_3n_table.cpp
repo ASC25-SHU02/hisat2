@@ -287,9 +287,9 @@ int hisat_3n_table()
         * We don't need to save the memory (maybe...) Load as long as the chromosome is the same.
         */
         // limit the linePool size to save memory
-        // while(positions->linePool.size() > 1000 * nThreads) {
-        //     this_thread::sleep_for (std::chrono::microseconds(1));
-        // }
+        while(positions->linePool.size() > 1000 * nThreads) {
+            this_thread::sleep_for (std::chrono::microseconds(1));
+        }
 
         // if the SAM line is empty or unmapped, get the next SAM line.
         if (!getSAMChromosomePos(line, samChromosome, samPos)) {
@@ -300,9 +300,7 @@ int hisat_3n_table()
         // then load a new reference chromosome.
         if (samChromosome != positions->chromosome) {
             // wait all line is processed
-            while (!positions->linePool.empty() || positions->outputPositionPool.size() > 100000) {
-                this_thread::sleep_for (std::chrono::microseconds(1));
-            }
+            std::cerr << "IF TOKEN\t";
             positions->appendingFinished();
             positions->moveAllToOutput();
             positions->loadNewChromosome(samChromosome);
@@ -311,19 +309,24 @@ int hisat_3n_table()
         }
         // if the samPos is larger than reloadPos, load 1 loadingBlockSize bp in from reference.
         while (samPos > reloadPos) {
-            while (!positions->linePool.empty() || positions->outputPositionPool.size() > 100000) {
-                this_thread::sleep_for (std::chrono::microseconds(1));
-            }
+            std::cerr << "WHILE LOOP\t";
             positions->appendingFinished();
+            std::cerr << positions->linePool.size() << '\t';
+            std::cerr << positions->linePool.shrinkedSize() << '\t';
+            std::cerr << "after appending finished\t";
             positions->moveBlockToOutput();
+            std::cerr << "after move block to output\t";
             positions->loadMore();
+            std::cerr << "after loadMore\t";
             reloadPos += loadingBlockSize;
+            std::cerr << "EXIT WHILE LOOP\t";
         }
         if (lastPos > samPos) {
             cerr << "The input alignment file is not sorted. Please use sorted SAM file as alignment file." << '\n';
             throw 1;
         }
-        positions->linePool.pushAndNotify(line);
+        std::cerr << "PUSH A NEW LINE\t";
+        positions->linePool.push(line);
         lastPos = samPos;
     }
     //}

@@ -197,7 +197,7 @@ public:
     SafeQueue<Position*> freePositionPool; // pool to store free position pointer for reference position.
     SafeQueue<Position*> outputPositionPool; // pool to store the reference position which is loaded and ready to output.
     bool working;
-    mutex mutex_;
+    // mutex mutex_;
     long long int refCoveredPosition; // this is the last position in reference chromosome we loaded in refPositions.
     ifstream refFile;
     vector<mutex*> workerLock; // one lock for one worker thread.
@@ -360,7 +360,7 @@ public:
                 if (refPositions[index]->empty() || refPositions[index]->strand == '?') {
                     returnPosition(refPositions[index]);
                 } else {
-                    outputPositionPool.pushAndNotify(refPositions[index]);
+                    outputPositionPool.push(refPositions[index]);
                 }
             } else {
                 break;
@@ -383,7 +383,7 @@ public:
                 returnPosition(refPositions[index]);
             } else {
                 vector<uniqueID>().swap(refPositions[index]->uniqueIDs);
-                outputPositionPool.pushAndNotify(refPositions[index]);
+                outputPositionPool.push(refPositions[index]);
             }
         }
         refPositions.clear();
@@ -466,6 +466,7 @@ public:
                 continue;
             }
 
+            // Works done by evey thread are stored here
             Position* pos = refPositions[index+b->refPos];
             assert (pos->location == startPos + b->refPos);
 
@@ -519,8 +520,14 @@ public:
 
     void close() {
         working = false;
-        outputPositionPool.close();
-        linePool.close();
+        Position* dummyPos = nullptr;
+        // getFreePosition(dummyPos);
+        // dummyPos->set('n');
+        outputPositionPool.push(dummyPos);
+        
+
+        string* dummyLine = nullptr;
+        linePool.push(dummyLine);
     }
 
     /**
@@ -531,12 +538,13 @@ public:
         string* line = nullptr;
         Alignment newAlignment;
 
+        // Ensure that only when the queue is empty and
+        // the thread finishes its work, 
+        // appendingFinished() can get the key.
+        std::unique_lock<std::mutex> lk(*workerLock[threadID]);
         while (working) {
-            std::unique_lock<std::mutex> lk(*workerLock[threadID]);
-
             linePool.popFrontOrWait(line, workerLock[threadID]);
             if (!working) break;
-            // if (line == nullptr || (*line).size() == 0) continue;
 
             while (refPositions.empty()) {
                 this_thread::sleep_for (std::chrono::microseconds(1));
@@ -544,7 +552,6 @@ public:
             newAlignment.parse(line);
             returnLine(line);
             appendPositions(newAlignment);
-            workerLock[threadID]->unlock();
         }
     }
 };
