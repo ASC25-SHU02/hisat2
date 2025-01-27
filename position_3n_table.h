@@ -193,8 +193,8 @@ public:
     long long int location; // current location (position) in reference chromosome.
     char lastBase = 'X'; // the last base of reference line. this is for CG_only mode.
     SafeQueue<string*> linePool; // pool to store unprocessed SAM line.
-    SafeQueue<string*> freeLinePool; // pool to store free string pointer for SAM line.
-    SafeQueue<Position*> freePositionPool; // pool to store free position pointer for reference position.
+    LockFreeQueue<string*> freeLinePool; // pool to store free string pointer for SAM line.
+    LockFreeQueue<Position*> freePositionPool; // pool to store free position pointer for reference position.
     SafeQueue<Position*> outputPositionPool; // pool to store the reference position which is loaded and ready to output.
     bool working;
     mutex mutex_;
@@ -491,9 +491,6 @@ public:
      * get a Position pointer from freePositionPool, if freePositionPool is empty, make a new Position pointer.
      */
     void getFreePosition(Position*& newPosition) {
-        while (outputPositionPool.size() >= 10000) {
-            this_thread::sleep_for (std::chrono::microseconds(1));
-        }
         if (freePositionPool.popFront(newPosition)) {
             return;
         } else {

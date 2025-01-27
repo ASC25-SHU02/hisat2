@@ -300,7 +300,7 @@ int hisat_3n_table()
         // then load a new reference chromosome.
         if (samChromosome != positions->chromosome) {
             // wait all line is processed
-            while (!positions->linePool.empty() || positions->outputPositionPool.size() > 100000) {
+            while (!positions->linePool.empty()) {
                 this_thread::sleep_for (std::chrono::microseconds(1));
             }
             positions->appendingFinished();
@@ -311,7 +311,7 @@ int hisat_3n_table()
         }
         // if the samPos is larger than reloadPos, load 1 loadingBlockSize bp in from reference.
         while (samPos > reloadPos) {
-            while (!positions->linePool.empty() || positions->outputPositionPool.size() > 100000) {
+            while (!positions->linePool.empty()) {
                 this_thread::sleep_for (std::chrono::microseconds(1));
             }
             positions->appendingFinished();

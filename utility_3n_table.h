@@ -25,7 +25,7 @@
 #include <iostream>
 #include <queue>
 #include <algorithm>
-
+#include "include/lockfreeQueue/concurrentqueue.h"
 using namespace std;
 
 /**
@@ -186,6 +186,34 @@ public:
         }
     }
 };
+
+/**
+ * lock-free queue, more to see in submodule
+ */
+template <typename T>
+class LockFreeQueue {
+private:
+    moodycamel::ConcurrentQueue<T> queue_;
+
+    string getReadName(string* line){
+        int startPosition = 0;
+        int endPosition;
+
+        endPosition = line->find("\t", startPosition);
+        string readName = line->substr(startPosition, endPosition - startPosition);
+        return readName;
+    }
+
+public:
+    bool popFront(T& value) {
+        return queue_.try_dequeue(value);
+    }
+
+    void push(T value) {
+        queue_.enqueue(value);
+    }
+};
+
 
 /**
  * simple safe queue
