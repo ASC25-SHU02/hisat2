@@ -46,3 +46,4 @@ docs/.*-cache
 *.pyc
 
 build/
+hisat-3n-table
