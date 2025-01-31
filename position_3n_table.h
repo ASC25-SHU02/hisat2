@@ -23,9 +23,6 @@
 #include <string>
 #include <vector>
 #include <fstream>
-#include <mutex>
-#include <thread>
-#include <condition_variable>
 #include <cassert>
 #include "alignment_3n_table.h"
 
@@ -59,7 +56,7 @@ public:
  * basic class to store reference position information
  */
 class Position{
-    mutex mutex_;
+    // mutex mutex_;
 public:
     string chromosome; // reference chromosome name
     long long int location; // 1-based position
@@ -94,7 +91,7 @@ public:
      */
 
     void set (string& inputChr, long long int inputLoc) {
-        chromosome = inputChr;
+        chromosome = inputChr; /*to be optimized*/
         location = inputLoc + 1;
     }
 
@@ -171,7 +168,6 @@ public:
      * append the SAM information into this position.
      */
     void appendBase (PosQuality& input, Alignment& a) {
-        mutex_.lock();
         if (appendReadNameID(input,a)) {
             if (input.converted) {
                 convertedQualities += input.qual;
@@ -179,7 +175,6 @@ public:
                 unconvertedQualities += input.qual;
             }
         }
-        mutex_.unlock();
     }
 };
 
@@ -192,36 +187,39 @@ public:
     string chromosome; // current reference chromosome name.
     long long int location; // current location (position) in reference chromosome.
     char lastBase = 'X'; // the last base of reference line. this is for CG_only mode.
-    SafeQueue<string*> linePool; // pool to store unprocessed SAM line.
-    LockFreeQueue<string*> freeLinePool; // pool to store free string pointer for SAM line.
-    LockFreeQueue<Position*> freePositionPool; // pool to store free position pointer for reference position.
-    SafeQueue<Position*> outputPositionPool; // pool to store the reference position which is loaded and ready to output.
-    bool working;
-    mutex mutex_;
+    // SafeQueue<string*> linePool; // pool to store unprocessed SAM line.
+    QueueWrapper<string*> freeLinePool; // pool to store free string pointer for SAM line.
+    QueueWrapper<Position*> freePositionPool; // pool to store free position pointer for reference position.
+    // SafeQueue<Position*> outputPositionPool; // pool to store the reference position which is loaded and ready to output.
+    // bool working;
+    // mutex mutex_;
     long long int refCoveredPosition; // this is the last position in reference chromosome we loaded in refPositions.
     ifstream refFile;
-    vector<mutex*> workerLock; // one lock for one worker thread.
-    int nThreads = 1;
+    // vector<mutex*> workerLock; // one lock for one worker thread.
+    // int nThreads = 1;
     ChromosomeFilePositions chromosomePos; // store the chromosome name and it's streamPos. To quickly find new chromosome in file.
     bool addedChrName = false;
     bool removedChrName = false;
 
+    ostream* out_;
+    ofstream tableFile;
+    Alignment newAlignment; 
     Positions(string inputRefFileName, int inputNThreads, bool inputAddedChrName, bool inputRemovedChrName) {
-        working = true;
-        nThreads = inputNThreads;
+        // working = true;
+        // nThreads = inputNThreads;
         addedChrName = inputAddedChrName;
         removedChrName = inputRemovedChrName;
-        for (int i = 0; i < nThreads; i++) {
-            workerLock.push_back(new mutex);
-        }
+        // for (int i = 0; i < nThreads; i++) {
+        //     workerLock.push_back(new mutex);
+        // }
         refFile.open(inputRefFileName, ios_base::in);
         LoadChromosomeNamesPos();
     }
 
     ~Positions() {
-        for (int i = 0; i < workerLock.size(); i++) {
-            delete workerLock[i];
-        }
+        // for (int i = 0; i < workerLock.size(); i++) {
+        //     delete workerLock[i];
+        // }
         Position* pos;
         while(freePositionPool.popFront(pos)) {
             delete pos;
@@ -313,38 +311,38 @@ public:
     /**
      * if we can go through all the workerLock, that means no worker is appending new position.
      */
-    void appendingFinished() {
-        // Seems workerLock() is only used here
-        for (int i = 0; i < nThreads; i++) {
-            workerLock[i]->lock();
-            workerLock[i]->unlock();
-        }
-    }
+    // void appendingFinished() {
+    //     // Seems workerLock() is only used here
+    //     for (int i = 0; i < nThreads; i++) {
+    //         workerLock[i]->lock();
+    //         workerLock[i]->unlock();
+    //     }
+    // }
 
-    /**
-     * the output function for output thread.
-     */
-    void outputFunction(string outputFileName) {
-        ostream* out_ = &cout;
-        ofstream tableFile;
+    void openOutput(string outputFileName) {
+        out_ = &cout;
         if (!outputFileName.empty()) {
             tableFile.open(outputFileName, ios_base::out);
             out_ = &tableFile;
         }
 
         *out_ << "ref\tpos\tstrand\tconvertedBaseCount\tunconvertedBaseCount\n";
-        Position* pos;
-        while (working) {
-            outputPositionPool.popFrontOrWait(pos);
-            if (!working) break;
+    }
+
+    void closeOutput() {
+        tableFile.close();
+    }
+
+    /**
+     * the output function
+     */
+    void outputFunction(Position* pos) {
             *out_ << pos->chromosome << '\t'
                             << to_string(pos->location) << '\t'
                             << pos->strand << '\t'
                             << to_string(pos->convertedQualities.size()) << '\t'
                             << to_string(pos->unconvertedQualities.size()) << '\n';
             returnPosition(pos);
-        }
-        tableFile.close();
     }
 
     /**
@@ -360,7 +358,8 @@ public:
                 if (refPositions[index]->empty() || refPositions[index]->strand == '?') {
                     returnPosition(refPositions[index]);
                 } else {
-                    outputPositionPool.pushAndNotify(refPositions[index]);
+                    outputFunction(refPositions[index]);
+                    // outputPositionPool.pushAndNotify(refPositions[index]);
                 }
             } else {
                 break;
@@ -383,7 +382,9 @@ public:
                 returnPosition(refPositions[index]);
             } else {
                 vector<uniqueID>().swap(refPositions[index]->uniqueIDs);
-                outputPositionPool.pushAndNotify(refPositions[index]);
+
+                outputFunction(refPositions[index]);
+                // outputPositionPool.pushAndNotify(refPositions[index]);
             }
         }
         refPositions.clear();
@@ -418,7 +419,6 @@ public:
                 }
             }
         }
-        std::cerr << "loadNewChromosome RETURN\t";
     }
 
     /**
@@ -514,35 +514,20 @@ public:
         freePositionPool.push(pos);
     }
 
-    void close() {
-        working = false;
-        outputPositionPool.close();
-        linePool.close();
-    }
+    // void close() {
+    //     working = false;
+    //     outputPositionPool.close();
+    //     linePool.close();
+    // }
 
     /**
      * this is the working function.
      * it take the SAM line from linePool, parse it.
      */
-    void append(int threadID) {
-        string* line = nullptr;
-        Alignment newAlignment;
-
-        while (working) {
-            std::unique_lock<std::mutex> lk(*workerLock[threadID]);
-
-            linePool.popFrontOrWait(line, workerLock[threadID]);
-            if (!working) break;
-            // if (line == nullptr || (*line).size() == 0) continue;
-
-            while (refPositions.empty()) {
-                this_thread::sleep_for (std::chrono::microseconds(1));
-            }
+    void append(string* line) {           
             newAlignment.parse(line);
             returnLine(line);
             appendPositions(newAlignment);
-            workerLock[threadID]->unlock();
-        }
     }
 };
 

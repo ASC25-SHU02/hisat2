@@ -245,16 +245,17 @@ int hisat_3n_table()
 {
     positions = new Positions(refFileName, nThreads, addedChrName, removedChrName);
 
-    // open #nThreads workers
-    vector<thread*> workers;
+    // // open #nThreads workers
+    // vector<thread*> workers;
 
-    for (int i = 0; i < nThreads; i++) {
-        workers.push_back(new thread(&Positions::append, positions, i));
-    }
+    // for (int i = 0; i < nThreads; i++) {
+    //     workers.push_back(new thread(&Positions::append, positions, i));
+    // }
 
     // open a output thread
-    thread outputThread;
-    outputThread = thread(&Positions::outputFunction, positions, outputFileName);
+    // thread outputThread;
+    // outputThread = thread(&Positions::outputFunction, positions, outputFileName);
+    positions->openOutput(outputFileName);
 
     // main function, initially 2 load loadingBlockSize (2,000,000) bp of reference, set reloadPos to 1 loadingBlockSize, then load SAM data.
     // when the samPos larger than the reloadPos load 1 loadingBlockSize bp of reference.
@@ -298,23 +299,25 @@ int hisat_3n_table()
         }
         // if the samChromosome is different than current positions' chromosome, finish all SAM line.
         // then load a new reference chromosome.
+
+
         if (samChromosome != positions->chromosome) {
-            // wait all line is processed
-            while (!positions->linePool.empty()) {
-                this_thread::sleep_for (std::chrono::microseconds(1));
-            }
-            positions->appendingFinished();
+        //     // wait all line is processed
+        //     // while (!positions->linePool.empty()) {
+        //     //     this_thread::sleep_for (std::chrono::microseconds(1));
+        //     // }
+        //     // positions->appendingFinished();
             positions->moveAllToOutput();
             positions->loadNewChromosome(samChromosome);
             reloadPos = loadingBlockSize;
             lastPos = 0;
         }
-        // if the samPos is larger than reloadPos, load 1 loadingBlockSize bp in from reference.
+        // // if the samPos is larger than reloadPos, load 1 loadingBlockSize bp in from reference.
         while (samPos > reloadPos) {
-            while (!positions->linePool.empty()) {
-                this_thread::sleep_for (std::chrono::microseconds(1));
-            }
-            positions->appendingFinished();
+        //     while (!positions->linePool.empty()) {
+        //         this_thread::sleep_for (std::chrono::microseconds(1));
+        //     }
+        //     positions->appendingFinished();
             positions->moveBlockToOutput();
             positions->loadMore();
             reloadPos += loadingBlockSize;
@@ -323,8 +326,10 @@ int hisat_3n_table()
             cerr << "The input alignment file is not sorted. Please use sorted SAM file as alignment file." << '\n';
             throw 1;
         }
-        positions->linePool.pushAndNotify(line);
-        lastPos = samPos;
+        // positions->linePool.pushAndNotify(line);
+        positions->append(line);
+
+        // lastPos = samPos;
     }
     //}
     if (!standardInMode) {
@@ -332,30 +337,31 @@ int hisat_3n_table()
     }
 
 
-    // prepare to close everything.
-    std::cerr << "I have finished all the works\t";
-    // make sure linePool is empty
-    while (!positions->linePool.empty()) {
-        this_thread::sleep_for (std::chrono::microseconds(100));
-    }
-    // make sure all workers finished their appending work.
-    positions->appendingFinished();
-    // move all position to outputPool
+    // // prepare to close everything.
+    // std::cerr << "I have finished all the works\t";
+    // // make sure linePool is empty
+    // while (!positions->linePool.empty()) {
+    //     this_thread::sleep_for (std::chrono::microseconds(100));
+    // }
+    // // make sure all workers finished their appending work.
+    // positions->appendingFinished();
+    // // move all position to outputPool
     positions->moveAllToOutput();
-    // wait until outputPool is empty
-    while (!positions->outputPositionPool.empty()) {
-        this_thread::sleep_for (std::chrono::microseconds(100));
-    }
-    // stop all thread and clean
-    while(positions->freeLinePool.popFront(line)) {
-        delete line;
-    }
-    positions->close();
-    for (int i = 0; i < nThreads; i++){
-        workers[i]->join();
-        delete workers[i];
-    }
-    outputThread.join();
+    // // wait until outputPool is empty
+    // while (!positions->outputPositionPool.empty()) {
+    //     this_thread::sleep_for (std::chrono::microseconds(100));
+    // }
+    // // stop all thread and clean
+    // while(positions->freeLinePool.popFront(line)) {
+    //     delete line;
+    // }
+    // positions->close();
+    // for (int i = 0; i < nThreads; i++){
+    //     workers[i]->join();
+    //     delete workers[i];
+    // }
+    // outputThread.join();
+    positions->closeOutput();
     delete positions;
     return 0;
 }

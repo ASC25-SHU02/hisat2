@@ -20,7 +20,7 @@
 #ifndef UTILITY_3N_TABLE_H
 #define UTILITY_3N_TABLE_H
 
-#include <mutex>
+// #include <mutex>
 #include <condition_variable>
 #include <iostream>
 #include <queue>
@@ -191,9 +191,9 @@ public:
  * lock-free queue, more to see in submodule
  */
 template <typename T>
-class LockFreeQueue {
+class QueueWrapper {
 private:
-    moodycamel::ConcurrentQueue<T> queue_;
+    std::queue<T> queue_;
 
     string getReadName(string* line){
         int startPosition = 0;
@@ -206,128 +206,21 @@ private:
 
 public:
     bool popFront(T& value) {
-        return queue_.try_dequeue(value);
-    }
-
-    void push(T value) {
-        queue_.enqueue(value);
-    }
-};
-
-
-/**
- * simple safe queue
- */
-template <typename T>
-class SafeQueue {
-private:
-    mutex mutex_;
-    queue<T> queue_;
-    std::condition_variable notEmpty_;
-    bool killed_ = false;
-
-    string getReadName(string* line){
-        int startPosition = 0;
-        int endPosition;
-
-        endPosition = line->find("\t", startPosition);
-        string readName = line->substr(startPosition, endPosition - startPosition);
-        return readName;
-    }
-
-public:
-    void pop() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        queue_.pop();
-    }
-
-    T front() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        return queue_.front();
-    }
-
-    int size() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        int s = queue_.size();
-        return s;
-    }
-
-    /**
-     * return true if the queue is not empty and pop front and get value.
-     * return false if the queue is empty.
-     */
-    bool popFront(T& value) {
-        std::unique_lock<std::mutex> lk(mutex_);
         bool isEmpty = queue_.empty();
         if (!isEmpty) {
             value = queue_.front();
             queue_.pop();
         }
         return !isEmpty;
+        // return queue_.try_dequeue(value);
     }
 
     void push(T value) {
-        std::unique_lock<std::mutex> lk(mutex_);
         queue_.push(value);
-    }
-
-    bool empty() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        return queue_.empty();
-    }
-
-    void close() {
-        std::unique_lock<std::mutex> lk(mutex_);
-        killed_ = true;
-        notEmpty_.notify_all();
-    }
-
-    void pushAndNotify(T value) {
-try {
-        // outputPositionPool get something to run, thus notify other to wake
-        std::unique_lock<std::mutex> lk(mutex_);
-        if (queue_.empty()) {
-            queue_.push(value);
-            notEmpty_.notify_all();
-        } else {
-            queue_.push(value);
-        }
-} catch (const std::exception& e) {
-    std::cerr << "Caught exception: " << e.what() << std::endl;
-    exit(1);
-}
-    }
-
-    void popFrontOrWait(T& pos) {
-try {
-        std::unique_lock<std::mutex> lk(mutex_);
-        if (queue_.empty()) {
-            notEmpty_.wait(lk);
-        }
-        if (killed_) return;
-        pos = queue_.front();
-        queue_.pop();
-} catch (const std::exception& e) {
-    std::cerr << "Caught exception: " << e.what() << std::endl;
-    exit(1);
-}
-    }
-
-    // overload popFrontOrWait with lock
-    void popFrontOrWait(T& pos, mutex* workerLock) {
-        std::unique_lock<std::mutex> lk(mutex_);
-        if (queue_.empty()) {
-            workerLock->unlock();
-            notEmpty_.wait(lk, [this]() { return !queue_.empty() || killed_; });
-            workerLock->lock();
-        }
-        if (killed_) {
-            return;
-        }
-        pos = queue_.front();
-        queue_.pop();
+        // queue_.enqueue(value);
     }
 };
+
 
 /**
  * store one chromosome and it's stream position
