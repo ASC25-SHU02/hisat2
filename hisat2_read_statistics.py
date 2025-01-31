@@ -32,7 +32,7 @@ SEQUENCE_FASTA    = 0
 SEQUENCE_FASTQ    = 1
 
 FASTA_EXTENSIONS = ["fa", "fasta", "fna"]
-FASTQ_EXTENSIONS = ["fq", "fastq"]
+FASTQ_EXTENSIONS = ["fq", "fastq", "fastq_cut"]
 
 MAX_SKIP_LINES = 10000
 """
@@ -128,6 +128,7 @@ def parse_type(fname):
         compression_type = COMPRESSION_BZIP2
         ext = ff[-2]
 
+    print(ext)
     if ext.lower() in FASTA_EXTENSIONS:
         sequence_type = SEQUENCE_FASTA
     elif ext.lower() in FASTQ_EXTENSIONS:
@@ -167,8 +168,9 @@ def generate_stats(length_map):
 def reads_stat(read_file, read_count):
     length_map = {}
     try:
+        # print(read_file)
         sequence_type, compression_type = parse_type(read_file)
-
+        print(f"sequence_type = {sequence_type}; compression_type = {compression_type}")
         if compression_type == COMPRESSION_GZIP:
             fp = gzip.open(read_file, 'rt')
         elif compression_type == COMPRESSION_BZIP2:
@@ -182,6 +184,7 @@ def reads_stat(read_file, read_count):
         elif sequence_type == SEQUENCE_FASTQ:
             fstream = parser_FQ(fp)
         else:
+            print("Here you are?")
             raise ValueError("Unsupported file format")
 
         cnt = 0
