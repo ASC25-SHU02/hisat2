@@ -1148,7 +1148,8 @@ public:
 
 							// Check cached MapGLF results
 							CacheKey<index_t> key{curtop, curbot, i};
-							if (auto it = RangeCache.find(key); it != RangeCache.end()) {
+							auto it = RangeCache.find(key);
+							if (it != RangeCache.end()) {
 								range = it->second;
 							} else {
 								SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
@@ -1202,7 +1203,8 @@ public:
                                     assert_lt(j1, j2);
                                     
 									CacheKey<index_t> tmp_key{curtop + j1, curtop + j2 + 1, i};
-									if (auto it = NodeRangeCache.find(tmp_key)); it != NodeRangeCache.end()) {
+									auto it = NodeRangeCache.find(tmp_key); 
+									if (it != NodeRangeCache.end()) {
 										tmp_node_range = it->second;	
 									} else {
 										SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
@@ -1276,7 +1278,8 @@ public:
                                     assert_lt(j1, j2);
 
 									CacheKey<index_t> key{curtop + j1, curtop + j2 + 1, i};
-									if (auto it = NodeRangeCache.find(key); it != NodeRangeCache.end()) {
+									auto it = NodeRangeCache.find(key); 
+									if (it != NodeRangeCache.end()) {
 										tmp_node_range = it->second;
 									} else {
 										SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
