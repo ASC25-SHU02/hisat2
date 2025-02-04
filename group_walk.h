@@ -1202,12 +1202,12 @@ public:
                                     assert_lt(j1, j2);
                                     
 									CacheKey<index_t> tmp_key{curtop + j1, curtop + j2 + 1, i};
-									if (auto it = NodeRangeCache<index_t>.find(tmp_key)); it != NodeRangeCache<index_t>.end()) {
+									if (auto it = NodeRangeCache.find(tmp_key)); it != NodeRangeCache.end()) {
 										tmp_node_range = it->second;	
 									} else {
 										SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
 										gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
-										NodeRangeCache<index_t>[tmp_key] = tmp_node_range;
+										NodeRangeCache[tmp_key] = tmp_node_range;
 									}
 
                                     assert_gt(tmp_node_range.second - tmp_node_range.first, 0);
@@ -1276,12 +1276,12 @@ public:
                                     assert_lt(j1, j2);
 
 									CacheKey<index_t> key{curtop + j1, curtop + j2 + 1, i};
-									if (auto it = NodeRangeCache<index_t>.find(key); it != NodeRangeCache<index_t>.end()) {
+									if (auto it = NodeRangeCache.find(key); it != NodeRangeCache.end()) {
 										tmp_node_range = it->second;
 									} else {
 										SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
 										gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
-										NodeRangeCache<index_t>[key] = tmp_node_range;
+										NodeRangeCache[key] = tmp_node_range;
 									}
 
                                     assert_gt(tmp_node_range.second - tmp_node_range.first, 0);
