@@ -92,6 +92,41 @@
 #include <unordered_map>
 #include <utility>
 #include <cassert>
+#include <tuple>
+
+namespace std {
+namespace {
+    template <class T>
+    inline void hash_combine(size_t& seed, const T& v) {
+        hash<T> hasher;
+        seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+    }
+
+    template <typename Tuple, size_t Index = tuple_size<Tuple>::value - 1>
+    struct HashValueImpl {
+        static void apply(size_t& seed, const Tuple& tuple) {
+            HashValueImpl<Tuple, Index-1>::apply(seed, tuple);
+            hash_combine(seed, get<Index>(tuple));
+        }
+    };
+
+    template <typename Tuple>
+    struct HashValueImpl<Tuple, 0> {
+        static void apply(size_t& seed, const Tuple& tuple) {
+            hash_combine(seed, get<0>(tuple));
+        }
+    };
+}
+
+template <typename... TT>
+struct hash<tuple<TT...>> {
+    size_t operator()(const tuple<TT...>& tt) const {
+        size_t seed = 0;
+        HashValueImpl<tuple<TT...>>::apply(seed, tt);
+        return seed;
+    }
+};
+}
 
 /**
  * Encapsulate an SA range and an associated list of slots where the resolved
@@ -517,7 +552,7 @@ public:
 		EList<GWState, S>& st,        // EList of GWStates for advancing range
 		GWHit<index_t, T>& hit,       // Corresponding hit structure
 		index_t range,                // range being inited
-		bool reportList,              // report resolutions, adding to 'res' list?
+		bool reportList,             // report resolutions, adding to 'res' list?
 		EList<WalkResult<index_t>, 16>* res,   // EList to append resolutions
 		WalkMetrics& met)             // update these metrics
 	{
@@ -529,8 +564,6 @@ public:
         pair<int, int> ret = make_pair(0, 0);
 		index_t trimBegin = 0, trimEnd = 0;
 		bool empty = true; // assume all resolved until proven otherwise
-		// Commit new information, if any, to the PListSlide.  Also,
-		// trim and check if we're done.
         assert_eq(node_bot - node_top, map_.size());
         ASSERT_ONLY(index_t num_orig_iedges = 0, orig_e = 0);
         index_t num_iedges = 0, e = 0;
@@ -1085,8 +1118,7 @@ public:
 			static std::unordered_map<
 				CacheKey,
 				CacheValue,
-				typename std::hash<CacheKey>,
-				typename std::equal_to<CacheKey>
+				std::hash<CacheKey>  // 使用我们定义的tuple哈希
 			> cache;
 
             for(index_t e = 0; e < node_iedge_count.size() + 1; e++) {
@@ -1134,8 +1166,6 @@ public:
                     assert_eq(curbot-curtop, (index_t)(gws.masks[i].size()));
                 }
 #endif
-				// I don't know whether this will have a conflict with main thread pool so I give up this
-                // #pragma omp parallel for reduction(+:ret.first, ret.second) schedule(dynamic)
                 for(int i = 0; i < 4; i++) {
                     if(in[i] > 0) {
                         // Non-empty range resulted
