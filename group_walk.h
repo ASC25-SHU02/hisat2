@@ -1074,8 +1074,20 @@ public:
 				std::pair<index_t, index_t> range;
 				std::pair<index_t, index_t> node_range;
 				decltype(backup_node_iedge_count) backup_nodes;
+
+				CacheValue(
+					const std::pair<index_t, index_t>& r,
+					const std::pair<index_t, index_t>& nr,
+					const decltype(backup_node_iedge_count)& bn
+				) : range(r), node_range(nr), backup_nodes(bn) {}
 			};
-			static std::unordered_map<CacheKey, CacheValue> cache;
+
+			static std::unordered_map<
+				CacheKey,
+				CacheValue,
+				typename std::hash<CacheKey>,
+				typename std::equal_to<CacheKey>
+			> cache;
 
             for(index_t e = 0; e < node_iedge_count.size() + 1; e++) {
                 if(e >= node_iedge_count.size()) {
@@ -1148,7 +1160,11 @@ public:
 								SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
 								range = gfm.mapGLF(curtloc, curbloc, i, &node_range, &tmp_node_iedge_count, cur_node_length);
 								// 存储到缓存
-								cache.emplace(key, CacheValue{range, node_range, tmp_node_iedge_count});
+								cache.emplace(
+									std::piecewise_construct,
+									std::forward_as_tuple(key),
+									std::forward_as_tuple(range, node_range, backup_node_iedge_count)
+								);
 							}
 
                             newtop = range.first;
@@ -1244,7 +1260,11 @@ public:
 								SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
 								range = gfm.mapGLF(curtloc, curbloc, i, &node_range, &tmp_node_iedge_count, cur_node_length);
 								// 存储到缓存
-								cache.emplace(key, CacheValue{range, node_range, tmp_node_iedge_count});
+								cache.emplace(
+									std::piecewise_construct,
+									std::forward_as_tuple(key),
+									std::forward_as_tuple(range, node_range, tmp_node_iedge_count)
+								);
 							}
 
                             assert_geq(range.second - range.first, node_range.second - node_range.first);
