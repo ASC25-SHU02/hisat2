@@ -87,6 +87,46 @@
 #include "read.h"
 #include "reference.h"
 #include "mem_ids.h"
+// #include <omp.h>
+#include <vector>
+#include <unordered_map>
+#include <utility>
+#include <cassert>
+#include <tuple>
+
+namespace std {
+namespace {
+    template <class T>
+    inline void hash_combine(size_t& seed, const T& v) {
+        hash<T> hasher;
+        seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+    }
+
+    template <typename Tuple, size_t Index = tuple_size<Tuple>::value - 1>
+    struct HashValueImpl {
+        static void apply(size_t& seed, const Tuple& tuple) {
+            HashValueImpl<Tuple, Index-1>::apply(seed, tuple);
+            hash_combine(seed, get<Index>(tuple));
+        }
+    };
+
+    template <typename Tuple>
+    struct HashValueImpl<Tuple, 0> {
+        static void apply(size_t& seed, const Tuple& tuple) {
+            hash_combine(seed, get<0>(tuple));
+        }
+    };
+}
+
+template <typename... TT>
+struct hash<tuple<TT...>> {
+    size_t operator()(const tuple<TT...>& tt) const {
+        size_t seed = 0;
+        HashValueImpl<tuple<TT...>>::apply(seed, tt);
+        return seed;
+    }
+};
+}
 
 /**
  * Encapsulate an SA range and an associated list of slots where the resolved
@@ -446,7 +486,6 @@ protected:
  */
 template<typename index_t, typename T>
 class GWState {
-	
 public:
 
 	GWState() : map_(0, GW_CAT) {
@@ -513,7 +552,7 @@ public:
 		EList<GWState, S>& st,        // EList of GWStates for advancing range
 		GWHit<index_t, T>& hit,       // Corresponding hit structure
 		index_t range,                // range being inited
-		bool reportList,              // report resolutions, adding to 'res' list?
+		bool reportList,             // report resolutions, adding to 'res' list?
 		EList<WalkResult<index_t>, 16>* res,   // EList to append resolutions
 		WalkMetrics& met)             // update these metrics
 	{
@@ -525,8 +564,6 @@ public:
         pair<int, int> ret = make_pair(0, 0);
 		index_t trimBegin = 0, trimEnd = 0;
 		bool empty = true; // assume all resolved until proven otherwise
-		// Commit new information, if any, to the PListSlide.  Also,
-		// trim and check if we're done.
         assert_eq(node_bot - node_top, map_.size());
         ASSERT_ONLY(index_t num_orig_iedges = 0, orig_e = 0);
         index_t num_iedges = 0, e = 0;
@@ -1063,6 +1100,27 @@ public:
 			// Still multiple elements being tracked
             index_t curtop = top, curbot = bot;
             index_t cur_node_top = node_top, cur_node_bot = node_bot;
+
+			// Cache struct for MapGLF results
+			using CacheKey = std::tuple<index_t, index_t, int, index_t>; // curtop, curbot, i, cur_node_length
+			struct CacheValue {
+				std::pair<index_t, index_t> range;
+				std::pair<index_t, index_t> node_range;
+				decltype(backup_node_iedge_count) backup_nodes;
+
+				CacheValue(
+					const std::pair<index_t, index_t>& r,
+					const std::pair<index_t, index_t>& nr,
+					const decltype(backup_node_iedge_count)& bn
+				) : range(r), node_range(nr), backup_nodes(bn) {}
+			};
+
+			static std::unordered_map<
+				CacheKey,
+				CacheValue,
+				std::hash<CacheKey>  // 使用我们定义的tuple哈希
+			> cache;
+
             for(index_t e = 0; e < node_iedge_count.size() + 1; e++) {
                 if(e >= node_iedge_count.size()) {
                     if(e > 0) {
@@ -1108,7 +1166,6 @@ public:
                     assert_eq(curbot-curtop, (index_t)(gws.masks[i].size()));
                 }
 #endif
-                
                 for(int i = 0; i < 4; i++) {
                     if(in[i] > 0) {
                         // Non-empty range resulted
@@ -1117,8 +1174,29 @@ public:
                             first = false;
                             pair<index_t, index_t> range, node_range;
                             backup_node_iedge_count.clear();
-                            SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
-                            range = gfm.mapGLF(curtloc, curbloc, i, &node_range, &backup_node_iedge_count, cur_node_bot - cur_node_top);
+
+							index_t cur_node_length = cur_node_bot - cur_node_top;
+							CacheKey key(curtop, curbot, i, cur_node_length);
+
+							auto cache_it = cache.find(key);
+							if (cache_it != cache.end()) {
+								// 缓存命中
+								range = cache_it->second.range;
+								node_range = cache_it->second.node_range;
+								tmp_node_iedge_count = cache_it->second.backup_nodes;
+							} else {
+								// 缓存未命中，正常调用 mapGLF
+								tmp_node_iedge_count.clear();
+								SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
+								range = gfm.mapGLF(curtloc, curbloc, i, &node_range, &tmp_node_iedge_count, cur_node_length);
+								// 存储到缓存
+								cache.emplace(
+									std::piecewise_construct,
+									std::forward_as_tuple(key),
+									std::forward_as_tuple(range, node_range, backup_node_iedge_count)
+								);
+							}
+
                             newtop = range.first;
                             newbot = range.second;
                             new_node_top = node_range.first;
@@ -1164,8 +1242,7 @@ public:
                                     }
                                     assert_lt(j1, j2);
                                     SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
-                                    gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
-                                    assert_gt(tmp_node_range.second - tmp_node_range.first, 0);
+                    				gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
                                     if(tmp_node_range.second - tmp_node_range.first == 1) {
                                         index_t jmap = gws.map[j];
                                         assert_lt(jmap, sa.offs.size());
@@ -1197,8 +1274,29 @@ public:
                             st.back().reset();
                             tmp_node_iedge_count.clear();
                             pair<index_t, index_t> range, node_range;
-                            SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
-                            range = gfm.mapGLF(curtloc, curbloc, i, &node_range, &tmp_node_iedge_count, cur_node_bot - cur_node_top);
+
+							index_t cur_node_length = cur_node_bot - cur_node_top;
+							CacheKey key(curtop, curbot, i, cur_node_length);
+
+							auto cache_it = cache.find(key);
+							if (cache_it != cache.end()) {
+								// 缓存命中
+								range = cache_it->second.range;
+								node_range = cache_it->second.node_range;
+								tmp_node_iedge_count = cache_it->second.backup_nodes;
+							} else {
+								// 缓存未命中，正常调用 mapGLF
+								tmp_node_iedge_count.clear();
+								SideLocus<index_t>::initFromTopBot(curtop, curbot, gfm.gh(), gfm.gfm(), curtloc, curbloc);
+								range = gfm.mapGLF(curtloc, curbloc, i, &node_range, &tmp_node_iedge_count, cur_node_length);
+								// 存储到缓存
+								cache.emplace(
+									std::piecewise_construct,
+									std::forward_as_tuple(key),
+									std::forward_as_tuple(range, node_range, tmp_node_iedge_count)
+								);
+							}
+
                             assert_geq(range.second - range.first, node_range.second - node_range.first);
                             index_t ntop = range.first;
                             index_t nbot = range.second;
@@ -1229,8 +1327,8 @@ public:
                                         }
                                     }
                                     assert_lt(j1, j2);
-                                    SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
-                                    gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
+									SideLocus<index_t>::initFromTopBot(curtop + j1, curtop + j2 + 1, gfm.gh(), gfm.gfm(), tmptloc, tmpbloc);
+									gfm.mapGLF(tmptloc, tmpbloc, i, &tmp_node_range);
                                     assert_gt(tmp_node_range.second - tmp_node_range.first, 0);
                                     if(tmp_node_range.second - tmp_node_range.first == 1) {
                                         index_t jmap = st.back().map_[j];
