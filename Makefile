@@ -28,6 +28,7 @@ CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
 CXX = $(CPP)
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
+OPENMP_FLAG = -fopenmp 
 BOWTIE_SHARED_MEM = 0
 
 # Detect Cygwin or MinGW
@@ -392,7 +393,7 @@ hisat2-build-l-debug: hisat2_build.cpp $(SHARED_CPPS) $(HEADERS)
 #
 
 hisat2-align-s: hisat2.cpp $(SEARCH_CPPS) $(SHARED_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) \
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) $(OPENMP_FLAG)\
 	$(DEFS) $(SRA_DEF) -DBOWTIE2 $(NOASSERT_FLAGS) -Wall \
 	$(INC) $(SEARCH_INC) \
 	-o $@ $< \
@@ -400,7 +401,7 @@ hisat2-align-s: hisat2.cpp $(SEARCH_CPPS) $(SHARED_CPPS) $(HEADERS) $(SEARCH_FRA
 	$(LIBS) $(SRA_LIB) $(SEARCH_LIBS)
 
 hisat2-align-l: hisat2.cpp $(SEARCH_CPPS) $(SHARED_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) \
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) $(OPENMP_FLAG)\
 	$(DEFS) $(SRA_DEF) -DBOWTIE2 -DBOWTIE_64BIT_INDEX $(NOASSERT_FLAGS) -Wall \
 	$(INC) $(SEARCH_INC) \
 	-o $@ $< \
@@ -409,7 +410,7 @@ hisat2-align-l: hisat2.cpp $(SEARCH_CPPS) $(SHARED_CPPS) $(HEADERS) $(SEARCH_FRA
 
 hisat2-align-s-debug: hisat2.cpp $(SEARCH_CPPS) $(SHARED_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(CXX) $(DEBUG_FLAGS) \
-	$(DEBUG_DEFS) $(EXTRA_FLAGS) \
+	$(DEBUG_DEFS) $(EXTRA_FLAGS) $(OPENMP_FLAG)\
 	$(DEFS) $(SRA_DEF) -DBOWTIE2 -Wall \
 	$(INC) $(SEARCH_INC) \
 	-o $@ $< \
@@ -418,7 +419,7 @@ hisat2-align-s-debug: hisat2.cpp $(SEARCH_CPPS) $(SHARED_CPPS) $(HEADERS) $(SEAR
 
 hisat2-align-l-debug: hisat2.cpp $(SEARCH_CPPS) $(SHARED_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(CXX) $(DEBUG_FLAGS) \
-	$(DEBUG_DEFS) $(EXTRA_FLAGS) \
+	$(DEBUG_DEFS) $(EXTRA_FLAGS) $(OPENMP_FLAG)\
 	$(DEFS) $(SRA_DEF) -DBOWTIE2 -DBOWTIE_64BIT_INDEX -Wall \
 	$(INC) $(SEARCH_INC) \
 	-o $@ $< \
