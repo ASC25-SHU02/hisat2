@@ -5892,8 +5892,10 @@ bool HI_Aligner<index_t, local_index_t>::getGenomeCoords(
               EListSlice<index_t, 16>(_offs, 0, nelt));
     _gws.init(gfm, ref, _sas, rnd, met);
     
+    #pragma omp parallel for schedule(dynamic, 16)
     for(index_t off = 0; off < nelt; off++) {
-        WalkResult<index_t> wr;
+        // WalkResult<index_t> wr;
+        thread_local WalkResult<index_t> wr;
         index_t tidx = 0, toff = 0, tlen = 0;
         _gws.advanceElement(
                             off,

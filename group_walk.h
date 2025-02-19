@@ -1503,9 +1503,13 @@ public:
 		assert(hit_.repOk(sa));
 		assert_lt(elt, sa.size()); // elt must fall within range
 		// Until we've resolved our element of interest...
+		#pragma unroll(4)
 		while(sa.offs[elt] == (index_t)OFF_MASK) {
 			// Get the GWState that contains our element of interest
-			size_t range = hit_.fmap[elt].first;
+			// size_t range = hit_.fmap[elt].first;
+			// 将频繁访问的成员变量提升为局部变量
+			const auto& fmap_elt = hit_.fmap[elt];  // 减少多次访问容器
+			size_t range = fmap_elt.first;
             assert_lt(range, st_.size());
 			st_.ensure(st_[range].node_bot - st_[range].node_top);
             // st_.ensure(4);
@@ -1528,6 +1532,10 @@ public:
 				prm);
 			assert(sa.offs[elt] != (index_t)OFF_MASK ||
 			       !st_[hit_.fmap[elt].first].doneResolving(sa));
+			// 合并条件判断
+			if (UNLIKELY(range >= st_.size())) {
+				__builtin_trap();
+			}
 		}
 		assert_neq((index_t)OFF_MASK, sa.offs[elt]);
 		// Report it!
