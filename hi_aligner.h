@@ -5892,7 +5892,8 @@ bool HI_Aligner<index_t, local_index_t>::getGenomeCoords(
               EListSlice<index_t, 16>(_offs, 0, nelt));
     _gws.init(gfm, ref, _sas, rnd, met);
     
-    #pragma omp parallel for schedule(dynamic, 16)
+    bool validHit = true;
+    #pragma omp parallel for schedule(dynamic, 16) reduction(&&:validHit)
     for(index_t off = 0; off < nelt; off++) {
         // WalkResult<index_t> wr;
         thread_local WalkResult<index_t> wr;
@@ -5917,12 +5918,15 @@ bool HI_Aligner<index_t, local_index_t>::getGenomeCoords(
                             rejectStraddle,        // reject straddlers?
                             straddled2);  // straddled?
         
-        straddled |= straddled2;
+        #pragma omp critical
+        {
+            straddled |= straddled2;
+        }
         
         if(tidx == (index_t)INDEX_MAX) {
             // The seed hit straddled a reference boundary so the seed
             // hit isn't valid
-            return false;
+            validHit = false;
         }
         index_t global_toff = toff, global_tidx = tidx;
         

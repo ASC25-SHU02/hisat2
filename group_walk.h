@@ -1532,10 +1532,6 @@ public:
 				prm);
 			assert(sa.offs[elt] != (index_t)OFF_MASK ||
 			       !st_[hit_.fmap[elt].first].doneResolving(sa));
-			// 合并条件判断
-			if (UNLIKELY(range >= st_.size())) {
-				__builtin_trap();
-			}
 		}
 		assert_neq((index_t)OFF_MASK, sa.offs[elt]);
 		// Report it!
